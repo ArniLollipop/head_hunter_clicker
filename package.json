@@ -1,0 +1,16 @@
+{
+  "name": "first-on-this-pc",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "puppeteer": "^21.7.0",
+    "random-useragent": "^0.5.0"
+  }
+}
