@@ -9,7 +9,10 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-let phoneNumber = "87777472747";
+const phoneNumber = "87777472747";
+const searchTextVacancy = "vue";
+let pageCount = 0;
+let count = 0;
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.75 Safari/537.36";
@@ -17,8 +20,6 @@ const USER_AGENT =
 const userAgent = randomUseragent.getRandom();
 
 const UA = userAgent || USER_AGENT;
-
-let count = 0;
 
 (async () => {
   const browser = await puppeteer.launch({ headless: "new" });
@@ -117,7 +118,7 @@ let count = 0;
       inputSearch.focus();
     });
 
-    await page.keyboard.type("Vue");
+    await page.keyboard.type(searchTextVacancy);
 
     await page.click('button[data-qa="search-button"]');
 
@@ -134,10 +135,6 @@ let count = 0;
 
       console.log(page.url(), "before click");
 
-      if (page.url()?.includes("vacancy_response")) {
-        await page.goto("https://almaty.hh.kz/search/vacancy?text=vue");
-      }
-
       await responseButtons[count]?.evaluate(async (responseButton) => {
         responseButton.click();
       });
@@ -148,6 +145,22 @@ let count = 0;
           count = 0;
           await getButtons();
         }, 4000);
+      }
+      if (page.url()?.includes("response")) {
+        await page.goto(
+          `https://almaty.hh.kz/search/vacancy?text=${searchTextVacancy}`
+        );
+        setTimeout(async () => {
+          count = 0;
+          await getButtons();
+        }, 4000);
+      }
+      console.log(responseButtons.length, count, "after click");
+      if (responseButtons.length < count) {
+        pageCount++;
+        await page.goto(
+          `https://almaty.hh.kz/search/vacancy?text=${searchTextVacancy}&page=${pageCount}`
+        );
       }
 
       const relocationButton = await page.$(
