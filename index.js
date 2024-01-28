@@ -11,6 +11,7 @@ const rl = readline.createInterface({
 
 const phoneNumber = "87777472747";
 const searchTextVacancy = "vue";
+const baseUrl = "https://almaty.hh.kz";
 let pageCount = 0;
 let count = 0;
 
@@ -38,22 +39,19 @@ const UA = userAgent || USER_AGENT;
     "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36"
   );
 
-  page.setDefaultNavigationTimeout(0);
-
-  await page.goto("https://almaty.hh.kz/account/login");
+  await page.goto(`${baseUrl}/account/login`);
 
   const inputPhone = await page.$('input[data-qa="account-signup-email"]');
-  const button = await page.$('button[data-qa="account-signup-submit"]');
 
-  await inputPhone.evaluate((inputPhone) => {
+  await inputPhone?.evaluate((inputPhone) => {
     inputPhone.focus();
   });
   console.log("focused");
 
-  await page.keyboard.type(phoneNumber);
+  await page?.keyboard.type(phoneNumber);
   console.log("typed");
 
-  const text = await inputPhone.evaluate((inputPhone) => {
+  const text = await inputPhone?.evaluate((inputPhone) => {
     return inputPhone.value || "nothing";
   });
   console.log("inputValue", text);
@@ -133,51 +131,45 @@ const UA = userAgent || USER_AGENT;
         'a[data-qa="vacancy-serp__vacancy_response"]'
       );
 
-      console.log(page.url(), "before click");
+      const urlsArr = [];
 
-      await responseButtons[count]?.evaluate(async (responseButton) => {
-        responseButton.click();
-      });
-
-      if (responseButtons[count] == undefined) {
-        setTimeout(async () => {
-          console.log(page.url(), "after click");
-          count = 0;
-          await getButtons();
-        }, 4000);
-      }
-      if (page.url()?.includes("response")) {
-        await page.goto(
-          `https://almaty.hh.kz/search/vacancy?text=${searchTextVacancy}`
+      for await (const responseButton of responseButtons) {
+        urlsArr.push(
+          await responseButton?.evaluate(async (responseButton) => {
+            responseButton.click();
+            return responseButton.href || "";
+          })
         );
         setTimeout(async () => {
-          count = 0;
-          await getButtons();
-        }, 4000);
-      }
-      console.log(responseButtons.length, count, "after click");
-      if (responseButtons.length < count) {
-        pageCount++;
-        await page.goto(
-          `https://almaty.hh.kz/search/vacancy?text=${searchTextVacancy}&page=${pageCount}`
-        );
-      }
+          const relocationButton = await page.$(
+            'button[data-qa="relocation-warning-confirm"]'
+          );
 
-      const relocationButton = await page.$(
-        'button[data-qa="relocation-warning-abort"]'
-      );
+          await relocationButton?.evaluate((relocationButton) => {
+            relocationButton?.click();
+          });
+        }, 2000);
 
-      if (relocationButton) {
-        await relocationButton?.evaluate((relocationButton) => {
-          relocationButton?.click();
-        });
+        if (page.url()?.includes("vacancy_response")) {
+          console.log("in response page");
+          await page.goto(
+            `${baseUrl}/search/vacancy?schedule=remote&search_field=name&search_field=company_name&search_field=description&text=${searchTextVacancy}&enable_snippets=false&page=${pageCount}`
+          );
+          setTimeout(async () => {
+            await getButtons();
+          }, 4000);
+        }
       }
-
       setTimeout(async () => {
-        console.log(page.url(), "after click");
-        count++;
-        await getButtons();
-      }, 4000);
+        pageCount++;
+        console.log(urlsArr);
+        await page.goto(
+          `${baseUrl}/search/vacancy?schedule=remote&search_field=name&search_field=company_name&search_field=description&text=${searchTextVacancy}&enable_snippets=false&page=${pageCount}`
+        );
+        setTimeout(async () => {
+          await getButtons();
+        }, 4000);
+      }, 2000);
     }, 2000);
   }
 
