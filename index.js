@@ -12,6 +12,8 @@ const rl = readline.createInterface({
 const phoneNumber = "87777472747";
 const searchTextVacancy = "vue";
 const baseUrl = "https://almaty.hh.kz";
+
+// schedule = remote;
 let pageCount = 0;
 let count = 0;
 
@@ -153,7 +155,7 @@ const UA = userAgent || USER_AGENT;
         if (page.url()?.includes("vacancy_response")) {
           console.log("in response page");
           await page.goto(
-            `${baseUrl}/search/vacancy?schedule=remote&search_field=name&search_field=company_name&search_field=description&text=${searchTextVacancy}&enable_snippets=false&page=${pageCount}`
+            `${baseUrl}/search/vacancy?&search_field=name&search_field=company_name&search_field=description&text=${searchTextVacancy}&enable_snippets=false&page=${pageCount}`
           );
           setTimeout(async () => {
             await getButtons();
