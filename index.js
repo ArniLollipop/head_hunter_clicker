@@ -2,7 +2,6 @@
 
 import puppeteer from "puppeteer";
 import readline from "readline";
-import randomUseragent from "random-useragent";
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -15,17 +14,23 @@ const baseUrl = "https://almaty.hh.kz";
 
 // schedule = remote;
 let pageCount = 0;
-let count = 0;
-
-const USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.75 Safari/537.36";
-
-const userAgent = randomUseragent.getRandom();
-
-const UA = userAgent || USER_AGENT;
 
 (async () => {
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: [
+      "--disable-gpu",
+      "--disable-dev-shm-usage",
+      "--disable-setuid-sandbox",
+      "--no-first-run",
+      "--no-sandbox",
+      "--no-zygote",
+      "--deterministic-fetch",
+      "--disable-features=IsolateOrigins",
+      "--disable-site-isolation-trials",
+      // '--single-process',
+    ],
+  });
   const page = await browser.newPage();
 
   await page.setViewport({
@@ -43,88 +48,76 @@ const UA = userAgent || USER_AGENT;
 
   await page.goto(`${baseUrl}/account/login`);
 
-  const inputPhone = await page.$('input[data-qa="account-signup-email"]');
+  await formSubmit();
 
-  await inputPhone?.evaluate((inputPhone) => {
-    inputPhone.focus();
-  });
-  console.log("focused");
+  await checkRecaptcha();
 
-  await page?.keyboard.type(phoneNumber);
-  console.log("typed");
+  async function formSubmit() {
+    const inputPhone = await page.$('input[data-qa="account-signup-email"]');
 
-  const text = await inputPhone?.evaluate((inputPhone) => {
-    return inputPhone.value || "nothing";
-  });
-  console.log("inputValue", text);
-
-  await page.click('button[data-qa="account-signup-submit"]');
-  console.log("clicked");
-
-  setTimeout(async () => {
-    const image = await page.$(".hhcaptcha-module_hhcaptcha-picture__-7tAb");
-
-    const language = await page.$('button[data-qa="captcha-language"]');
-
-    const languageText = await language.evaluate((language) => {
-      return language.innerHTML || "nothing";
+    await inputPhone?.evaluate((inputPhone) => {
+      inputPhone.focus();
     });
+    console.log("focused");
 
-    console.log(languageText);
+    await page?.keyboard.type(phoneNumber);
+    console.log("typed");
 
-    const imageSrc = await image.evaluate((image) => {
-      return image.src;
+    const text = await inputPhone?.evaluate((inputPhone) => {
+      return inputPhone.value || "nothing";
     });
-    console.log(imageSrc, "imageSrc");
+    console.log("inputValue", text);
 
-    if (imageSrc.includes("login")) {
-      await loginOtp();
-    } else {
-      rl.question("Write recaptcha? ", async function (answer) {
-        console.log(`text is ${answer}`);
-        const recaptcha = answer;
+    await page.click('button[data-qa="account-signup-submit"]');
+    console.log("clicked");
+  }
 
-        setTimeout(async () => {
-          const inputRecaptcha = await page.$(
-            'input[data-qa="account-captcha-input"]'
-          );
+  async function checkRecaptcha() {
+    setTimeout(async () => {
+      const image = await page.$(".hhcaptcha-module_hhcaptcha-picture__-7tAb");
 
-          await inputRecaptcha.evaluate((inputRecaptcha) => {
-            inputRecaptcha.focus();
-          });
-
-          await page.keyboard.type(recaptcha);
-
-          const recaptchaText = await inputRecaptcha.evaluate(
-            (inputRecaptcha) => {
-              inputRecaptcha.value;
-            }
-          );
-
-          console.log(recaptchaText, "recaptchaText");
-
-          await page.click('button[data-qa="account-signup-submit"]');
-
-          await loginOtp();
-        }, 5000);
+      const imageSrc = await image.evaluate((image) => {
+        return image.src;
       });
-    }
-  }, 5000);
+      console.log(imageSrc);
+
+      if (imageSrc.includes("login")) {
+        await loginOtp();
+      } else {
+        rl.question("Write recaptcha? ", async function (answer) {
+          const recaptcha = answer;
+
+          setTimeout(async () => {
+            const inputRecaptcha = await page.$(
+              'input[data-qa="account-captcha-input"]'
+            );
+
+            await inputRecaptcha.evaluate((inputRecaptcha) => {
+              inputRecaptcha.focus();
+            });
+
+            await page.keyboard.type(recaptcha);
+
+            const recaptchaText = await inputRecaptcha.evaluate(
+              (inputRecaptcha) => {
+                inputRecaptcha.value;
+              }
+            );
+
+            await page.click('button[data-qa="account-signup-submit"]');
+
+            await loginOtp();
+          }, 2000);
+        });
+      }
+    }, 2000);
+  }
 
   async function search() {
-    const inputSearch = await page.$('input[data-qa="search-input"]');
-
-    await inputSearch.evaluate((inputSearch) => {
-      inputSearch.focus();
-    });
-
-    await page.keyboard.type(searchTextVacancy);
-
-    await page.click('button[data-qa="search-button"]');
-
-    setTimeout(async () => {
-      await getButtons();
-    }, 5000);
+    await page.goto(
+      `${baseUrl}/search/vacancy?text=${searchTextVacancy}&salary=&ored_clusters=true&search_field=name&hhtmFrom=vacancy_search_list&hhtmFromLabel=vacancy_search_line`
+    );
+    await getButtons();
   }
 
   async function getButtons() {
@@ -133,46 +126,66 @@ const UA = userAgent || USER_AGENT;
         'a[data-qa="vacancy-serp__vacancy_response"]'
       );
 
-      const urlsArr = [];
+      const buttonUrls = [];
 
       for await (const responseButton of responseButtons) {
-        urlsArr.push(
-          await responseButton?.evaluate(async (responseButton) => {
-            responseButton.click();
-            return responseButton.href || "";
+        buttonUrls.push(
+          await responseButton?.evaluate((responseButton) => {
+            setTimeout(() => {
+              responseButton.click();
+            }, 4000);
+            return responseButton.href;
           })
         );
-        setTimeout(async () => {
-          const relocationButton = await page.$(
-            'button[data-qa="relocation-warning-confirm"]'
-          );
 
-          await relocationButton?.evaluate((relocationButton) => {
-            relocationButton?.click();
-          });
-        }, 2000);
+        await checkRelocation();
+
+        console.log(page.url(), "page.url()");
 
         if (page.url()?.includes("vacancy_response")) {
-          console.log("in response page");
-          await page.goto(
-            `${baseUrl}/search/vacancy?&search_field=name&search_field=company_name&search_field=description&text=${searchTextVacancy}&enable_snippets=false&page=${pageCount}`
-          );
-          setTimeout(async () => {
-            await getButtons();
-          }, 4000);
+          console.log("route back");
+          await routeBack();
         }
       }
-      setTimeout(async () => {
-        pageCount++;
-        console.log(urlsArr);
-        await page.goto(
-          `${baseUrl}/search/vacancy?schedule=remote&search_field=name&search_field=company_name&search_field=description&text=${searchTextVacancy}&enable_snippets=false&page=${pageCount}`
-        );
-        setTimeout(async () => {
-          await getButtons();
-        }, 4000);
-      }, 2000);
+
+      console.log(buttonUrls);
+
+      await pagination();
+    }, 4000);
+  }
+
+  async function checkRelocation() {
+    setTimeout(async () => {
+      const relocationButton = await page.$(
+        'button[data-qa="relocation-warning-confirm"]'
+      );
+
+      if (relocationButton)
+        await relocationButton?.evaluate((relocationButton) => {
+          relocationButton?.click();
+        });
+      else return;
     }, 2000);
+  }
+
+  async function routeBack() {
+    await page.goto(
+      `${baseUrl}/search/vacancy?text=${searchTextVacancy}&salary=&ored_clusters=true&search_field=name&hhtmFrom=vacancy_search_list&hhtmFromLabel=vacancy_search_line&page=${pageCount}`
+    );
+    setTimeout(async () => {
+      await getButtons();
+    }, 2000);
+  }
+
+  async function pagination() {
+    setTimeout(async () => {
+      pageCount++;
+      await page.goto(
+        `${baseUrl}/search/vacancy?text=${searchTextVacancy}&salary=&ored_clusters=true&search_field=name&hhtmFrom=vacancy_search_list&hhtmFromLabel=vacancy_search_line&page=${pageCount}`
+      );
+    }, 5000);
+
+    await getButtons();
   }
 
   async function loginOtp() {
@@ -184,7 +197,6 @@ const UA = userAgent || USER_AGENT;
       });
 
       rl.question("Write OtpCode? ", async function (answer) {
-        console.log(`OtpCode is ${answer}`);
         const otpCode = answer;
         rl.close();
 
@@ -194,8 +206,8 @@ const UA = userAgent || USER_AGENT;
 
         setTimeout(async () => {
           await search();
-        }, 5000);
+        }, 2000);
       });
-    }, 5000);
+    }, 2000);
   }
 })();
