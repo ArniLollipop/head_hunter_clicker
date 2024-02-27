@@ -10,7 +10,7 @@ const rl = readline.createInterface({
 
 const phoneNumber = "87777472747";
 const searchTextVacancy = "vue";
-const baseUrl = "https://almaty.hh.kz";
+const baseUrl = "https://hh.kz";
 
 // schedule = remote;
 let pageCount = 0;
@@ -55,8 +55,8 @@ let pageCount = 0;
   async function formSubmit() {
     const inputPhone = await page.$('input[data-qa="account-signup-email"]');
 
-    await inputPhone?.evaluate((inputPhone) => {
-      inputPhone.focus();
+    await inputPhone?.evaluate(async (inputPhone) => {
+      await inputPhone.focus();
     });
     console.log("focused");
 
@@ -92,8 +92,8 @@ let pageCount = 0;
               'input[data-qa="account-captcha-input"]'
             );
 
-            await inputRecaptcha.evaluate((inputRecaptcha) => {
-              inputRecaptcha.focus();
+            await inputRecaptcha.evaluate(async (inputRecaptcha) => {
+              await inputRecaptcha.focus();
             });
 
             await page.keyboard.type(recaptcha);
@@ -115,75 +115,74 @@ let pageCount = 0;
 
   async function search() {
     await page.goto(
-      `${baseUrl}/search/vacancy?text=${searchTextVacancy}&salary=&ored_clusters=true&search_field=name&hhtmFrom=vacancy_search_list&hhtmFromLabel=vacancy_search_line`
+      "/search/vacancy?ored_clusters=true&resume=d9215d98ff056f58fd0039ed1f6f5a55785962&schedule=remote&search_period=7&forceFiltersSaving=true"
     );
     await getButtons();
   }
 
   async function getButtons() {
-    setTimeout(async () => {
-      const responseButtons = await page.$$(
-        'a[data-qa="vacancy-serp__vacancy_response"]'
+    const responseButtons = await page.$$(
+      'a[data-qa="vacancy-serp__vacancy_response"]'
+    );
+
+    const buttonUrls = [];
+
+    for await (const responseButton of responseButtons) {
+      buttonUrls.push(
+        await responseButton?.evaluate(async (responseButton) => {
+          await responseButton.click();
+          return responseButton.href;
+        })
       );
 
-      const buttonUrls = [];
+      console.log(page.url(), "page.url()");
+      await checkRelocation();
 
-      for await (const responseButton of responseButtons) {
-        buttonUrls.push(
-          await responseButton?.evaluate((responseButton) => {
-            setTimeout(() => {
-              responseButton.click();
-            }, 4000);
-            return responseButton.href;
-          })
-        );
-
-        await checkRelocation();
-
-        console.log(page.url(), "page.url()");
-
-        if (page.url()?.includes("vacancy_response")) {
-          console.log("route back");
-          await routeBack();
-        }
+      if (page.url()?.includes("vacancy_response")) {
+        console.log("route back");
+        await routeBack();
       }
+    }
 
-      console.log(buttonUrls);
-
-      await pagination();
-    }, 4000);
+    console.log(buttonUrls);
+    await pagination();
   }
-
+  let counterRelocationTimeOut = 0;
   async function checkRelocation() {
-    setTimeout(async () => {
-      const relocationButton = await page.$(
-        'button[data-qa="relocation-warning-confirm"]'
+    const relocationButton = await page.$(
+      'button[data-qa="relocation-warning-confirm"]'
+    );
+    if (relocationButton) {
+      console.log(
+        await relocationButton?.evaluate(async (relocationButton) => {
+          await relocationButton?.click();
+          return relocationButton.innerHTML;
+        })
       );
-
-      if (relocationButton)
-        await relocationButton?.evaluate((relocationButton) => {
-          relocationButton?.click();
-        });
-      else return;
-    }, 2000);
+    } else {
+      if (counterRelocationTimeOut < 100) {
+        counterRelocationTimeOut++;
+        await checkRelocation();
+      } else {
+        counterRelocationTimeOut = 0;
+      }
+    }
   }
 
   async function routeBack() {
     await page.goto(
-      `${baseUrl}/search/vacancy?text=${searchTextVacancy}&salary=&ored_clusters=true&search_field=name&hhtmFrom=vacancy_search_list&hhtmFromLabel=vacancy_search_line&page=${pageCount}`
+      "https://hh.kz/search/vacancy?ored_clusters=true&resume=d9215d98ff056f58fd0039ed1f6f5a55785962&schedule=remote&search_period=7&forceFiltersSaving=true&page=" +
+        pageCount
     );
-    setTimeout(async () => {
-      await getButtons();
-    }, 2000);
+    await getButtons();
   }
 
   async function pagination() {
-    setTimeout(async () => {
-      pageCount++;
-      await page.goto(
-        `${baseUrl}/search/vacancy?text=${searchTextVacancy}&salary=&ored_clusters=true&search_field=name&hhtmFrom=vacancy_search_list&hhtmFromLabel=vacancy_search_line&page=${pageCount}`
-      );
-    }, 5000);
+    pageCount++;
+    await page.goto(
+      "https://hh.kz/search/vacancy?ored_clusters=true&resume=d9215d98ff056f58fd0039ed1f6f5a55785962&schedule=remote&search_period=7&forceFiltersSaving=true&=page" +
+        pageCount
+    );
 
     await getButtons();
   }
@@ -192,8 +191,8 @@ let pageCount = 0;
     setTimeout(async () => {
       const inputOtpCode = await page.$('input[data-qa="otp-code-input"]');
 
-      await inputOtpCode.evaluate((inputOtpCode) => {
-        inputOtpCode.focus();
+      await inputOtpCode.evaluate(async (inputOtpCode) => {
+        await inputOtpCode.focus();
       });
 
       rl.question("Write OtpCode? ", async function (answer) {
