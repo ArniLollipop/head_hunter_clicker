@@ -9,6 +9,8 @@ import {
   DEV_MODE,
 } from "./constants.js";
 
+let pageCount = 0;
+
 (async () => {
   const browser = await puppeteer.launch({
     headless: DEV_MODE,
@@ -32,9 +34,9 @@ import {
     isLandscape: false,
     isMobile: false,
   });
-  await page.setUserAgent(
-    "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36"
-  );
+  // await page.setUserAgent(
+  //   "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36"
+  // );
 
   try {
     await login();
@@ -46,7 +48,7 @@ import {
   }
 
   async function login() {
-    await page.goto(`${BASE_URL}/account/login`, { waitUntil: "networkidle2" });
+    await page.goto(`${BASE_URL}/account/login`);
     await formSubmit();
     await checkRecaptcha();
   }
@@ -187,7 +189,7 @@ import {
     const optCode = await askUser("Write optCode?");
     await focusAndTypeInput('input[data-qa="otp-code-input"]', optCode);
     await handleClick('button[data-qa="otp-code-submit"]');
-    await page.waitForNavigation({ waitUntil: "networkidle2" });
+    await page.waitForNavigation();
     await search();
   }
 })();
