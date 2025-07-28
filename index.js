@@ -5,11 +5,10 @@ import {
   TIMEOUT,
   BASE_URL,
   PHONE_NUMBER,
-  RELOCATION_TIMEOUT,
   DEV_MODE,
 } from "./constants.js";
 
-let pageCount = 0;
+let pageCount = 1;
 
 (async () => {
   const browser = await puppeteer.launch({
@@ -34,9 +33,6 @@ let pageCount = 0;
     isLandscape: false,
     isMobile: false,
   });
-  // await page.setUserAgent(
-  //   "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36"
-  // );
 
   try {
     await login();
@@ -49,14 +45,17 @@ let pageCount = 0;
 
   async function login() {
     await page.goto(`${BASE_URL}/account/login`);
+    const buttonLoginAsWorkerSelector = 'button[data-qa="submit-button"]';
+    await handleClick(buttonLoginAsWorkerSelector);
     await formSubmit();
     await checkRecaptcha();
   }
 
   async function formSubmit() {
-    const emailInputSelector = 'input[data-qa="account-signup-email"]';
-    const submitButtonSelector = 'button[data-qa="account-signup-submit"]';
-    await focusAndTypeInput(emailInputSelector, PHONE_NUMBER);
+    const phoneInputSelector =
+      'input[data-qa="magritte-phone-input-national-number-input"]';
+    const submitButtonSelector = 'button[data-qa="submit-button"]';
+    await focusAndTypeInput(phoneInputSelector, PHONE_NUMBER);
     await handleClick(submitButtonSelector);
   }
   /**
@@ -95,13 +94,15 @@ let pageCount = 0;
       });
     });
   }
+
   async function handleRecaptcha() {
     const captchaInput = 'input[data-qa="account-captcha-input"]';
     const captchaText = await askUser("Write captcha?");
 
     await focusAndTypeInput(captchaInput, captchaText);
-    await handleClick('button[data-qa="account-signup-submit"]');
+    await handleClick('button[data-qa="submit-button"]');
   }
+
   async function checkRecaptcha() {
     const captchaImageSelector = ".hhcaptcha-module_hhcaptcha-picture__-7tAb";
     const captchaImage = await page.$(captchaImageSelector);
@@ -118,55 +119,86 @@ let pageCount = 0;
       await search();
     }, 2000);
   }
+
   async function getButtons() {
     const responseButtons = await page.$$(
       'a[data-qa="vacancy-serp__vacancy_response"]'
     );
 
-    const buttonUrls = [];
+    console.log("responseButtons");
+    let buttonUrls = [];
+    let skippedButtons = [];
 
     for await (const responseButton of responseButtons) {
-      buttonUrls.push(
-        await responseButton?.evaluate(async (responseButton) => {
-          await responseButton.click();
-          return responseButton.href;
-        })
-      );
+      const url = await responseButton?.evaluate(async (responseButton) => {
+        await responseButton.click();
+        return responseButton.href;
+      });
+      console.log("url", url);
 
+      if (!skippedButtons.includes(url)) {
+        buttonUrls.push(url);
+      } else {
+        continue;
+      }
+
+      console.log("before checkRelocation");
       await checkRelocation();
+      console.log("after checkRelocation");
+
+      console.log("before checkOverlayModal");
+      await checkOverlayModal();
+      console.log("after checkOverlayModal");
 
       if (page.url()?.includes("vacancy_response")) {
-        console.log("route back");
+        skippedButtons.push(url);
+        console.log("before routeBack");
         await routeBack();
+        console.log("after routeBack");
       }
     }
 
+    console.log("pagination");
     await pagination();
   }
+
   async function checkRelocation() {
-    const relocationButton = await page.$(
-      'button[data-qa="relocation-warning-confirm"]'
-    );
-    if (relocationButton) {
-      console.log(
-        await relocationButton?.evaluate(async (relocationButton) => {
-          await relocationButton?.click();
-          return relocationButton.innerHTML;
-        })
-      );
-    } else {
-      if (counterRelocationTimeOut < RELOCATION_TIMEOUT) {
-        counterRelocationTimeOut++;
-        await checkRelocation();
-      } else {
-        counterRelocationTimeOut = 0;
+    await new Promise((resolve) => setTimeout(resolve, TIMEOUT));
+
+    const relocationModal = await page.$('div[data-qa="magritte-alert"]');
+
+    if (relocationModal) {
+      console.log("relocationModal found");
+      const relocationButton = 'button[data-qa="relocation-warning-confirm"]';
+      const element = await page.$(relocationButton);
+      await element.click();
+      console.log("relocationButton clicked");
+    }
+
+    return;
+  }
+
+  async function checkOverlayModal() {
+    await new Promise((resolve) => setTimeout(resolve, TIMEOUT));
+    const overlayModal = await page.$('div[data-qa="modal-overlay"]');
+    if (overlayModal) {
+      const closeButtonClass =
+        "magritte-view___TfcUt_12-1-0 magritte-shadow-level-0___ko9ze_12-1-0";
+      await handleClick(closeButtonClass);
+
+      const targetText = "Не надо";
+      const span = await page.$eval(`span:has-text("${targetText}")`);
+
+      if (span) {
+        await handleClick(`span:has-text("${targetText}")`);
       }
     }
   }
 
   async function routeBack() {
     await page.goto(
-      `${BASE_URL}/search/vacancy?text=${VACANCY}&ored_clusters=true&resume=d9215d98ff056f58fd0039ed1f6f5a55785962&schedule=remote&search_period=7&forceFiltersSaving=true&page=${pageCount}`
+      `${BASE_URL}/search/vacancy?hhtmFrom=main&hhtmFromLabel=vacancy_search_line&enable_snippets=false&L_save_area=true&search_field=name&search_field=company_name&search_field=description&work_format=REMOTE&text=${VACANCY}&page=${pageCount}`,
+      { waitUntil: "domcontentloaded" }
     );
     await getButtons();
   }
@@ -174,21 +206,27 @@ let pageCount = 0;
   async function pagination() {
     pageCount++;
     await page.goto(
-      `${BASE_URL}/search/vacancy?text=${VACANCY}&ored_clusters=true&resume=d9215d98ff056f58fd0039ed1f6f5a55785962&schedule=remote&search_period=7&forceFiltersSaving=true&=page${pageCount}`
+      `${BASE_URL}/search/vacancy?hhtmFrom=main&hhtmFromLabel=vacancy_search_line&enable_snippets=false&L_save_area=true&search_field=name&search_field=company_name&search_field=description&work_format=REMOTE&text=${VACANCY}&page=${pageCount}`,
+      { waitUntil: "domcontentloaded" }
     );
 
     await getButtons();
   }
 
   async function search() {
-    await page.goto("https://hh.ru", { waitUntil: "domcontentloaded" });
+    await page.goto(
+      `${BASE_URL}/search/vacancy?hhtmFrom=main&hhtmFromLabel=vacancy_search_line&enable_snippets=false&L_save_area=true&search_field=name&search_field=company_name&search_field=description&work_format=REMOTE&text=${VACANCY}&page=${pageCount}`,
+      { waitUntil: "domcontentloaded" }
+    );
     await getButtons();
   }
 
   async function loginOtp() {
     const optCode = await askUser("Write optCode?");
-    await focusAndTypeInput('input[data-qa="otp-code-input"]', optCode);
-    await handleClick('button[data-qa="otp-code-submit"]');
+    await focusAndTypeInput(
+      'input[data-qa="applicant-login-input-otp"]',
+      optCode
+    );
     await page.waitForNavigation();
     await search();
   }
