@@ -24,7 +24,6 @@ let pageCount = 1;
     output: process.stdout,
   });
   const page = await browser.newPage();
-  let counterRelocationTimeOut = 0;
   await page.setViewport({
     width: 1920 + Math.floor(Math.random() * 100),
     height: 3000 + Math.floor(Math.random() * 100),
@@ -58,11 +57,7 @@ let pageCount = 1;
     await focusAndTypeInput(phoneInputSelector, PHONE_NUMBER);
     await handleClick(submitButtonSelector);
   }
-  /**
-   * @async
-   * @param {string} selector - Selector for element
-   * @param {string} text - Text for input
-   */
+
   async function focusAndTypeInput(selector, text) {
     const typeElement = await page.waitForSelector(selector, {
       visible: true,
@@ -71,21 +66,12 @@ let pageCount = 1;
     await typeElement.focus();
     await page.keyboard.type(text);
   }
-  /**
-   * @async
-   * @param {string} selector - Selector for element
-   */
+
   async function handleClick(selector) {
     await page.waitForSelector(selector);
     const element = await page.$(selector);
     await element.click();
   }
-  /**
-   * @Eg0r0k
-   * @async
-   * @param {string} question - Question for user
-   * @returns {Promise<string>}
-   */
 
   async function askUser(question) {
     return new Promise((resolve) => {
