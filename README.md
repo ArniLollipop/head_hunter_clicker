@@ -1,5 +1,3 @@
-This is the head hunter clicker to offers.
-
 Used Library puppeteer(https://www.npmjs.com/package/puppeteer) for parsing and readline for write some info to the console
 
 const phoneNumber = "87777472747";
